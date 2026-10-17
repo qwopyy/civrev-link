@@ -1,0 +1,9 @@
+rpcs3/
+game/
+*.pup
+*.iso
+*.pkg
+state/
+__pycache__/
+*.pyc
+.pytest_cache/
