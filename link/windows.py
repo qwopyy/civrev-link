@@ -86,6 +86,37 @@ def run_admin_batch(commands: list[list[str]], *, required: int) -> None:
     _run_admin_batch(admin_batch(commands, required=required), accept=(0,))
 
 
+def tunnel_service_name(conf: Path) -> str:
+    """WireGuard names the Windows service after the config file."""
+    return f"WireGuardTunnel${conf.stem}"
+
+
+def tunnel_action(state: str | None) -> str:
+    """A running tunnel is left alone. A stopped one is started. A missing one is installed."""
+    if state == "running":
+        return "skip"
+    if state is None:
+        return "install"
+    return "start"
+
+
+def tunnel_state(conf: Path) -> str | None:
+    result = subprocess.run(
+        ["sc", "query", tunnel_service_name(conf)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    match = re.search(r"STATE\s*:\s*(\d+)", result.stdout)
+    if match is None:
+        return None
+    if int(match.group(1)) == 4:
+        return "running"
+    return "stopped"
+
+
 def _run_admin_batch(script: str, *, accept: tuple[int, ...]) -> None:
     if not is_windows():
         raise SystemExit("This step only runs on Windows.")

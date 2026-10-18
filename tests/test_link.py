@@ -22,7 +22,7 @@ from link.packets import build_ipv4_udp, parse_ip_udp
 from link.rpcs3 import _game_yaml, _keyboard_yaml, _write_configs, download_linked_file, filename_from_url
 from link.state import HostState
 from link.wgutil import client_config, first_existing, server_config
-from link.windows import admin_batch, latest_msi_name, msiexec_install_args, wireguard_arch
+from link.windows import admin_batch, latest_msi_name, msiexec_install_args, tunnel_action, tunnel_service_name, wireguard_arch
 
 
 class PacketTests(unittest.TestCase):
@@ -165,6 +165,12 @@ class RoomTests(unittest.TestCase):
         args = msiexec_install_args(Path(r"C:\Downloads\wireguard-amd64-1.10.0.msi"))
         self.assertEqual(args[:2], ["msiexec", "/i"])
         self.assertEqual(args[-2:], ["/qn", "DO_NOT_LAUNCH=1"])
+
+    def test_play_does_not_reinstall_a_running_windows_tunnel(self) -> None:
+        self.assertEqual(tunnel_service_name(Path("civrev.conf")), "WireGuardTunnel$civrev")
+        self.assertEqual(tunnel_action("running"), "skip")
+        self.assertEqual(tunnel_action("stopped"), "start")
+        self.assertEqual(tunnel_action(None), "install")
 
     def test_tunnel_failure_is_not_hidden_by_later_firewall_rules(self) -> None:
         script = admin_batch(

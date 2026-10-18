@@ -32,7 +32,7 @@ def main() -> None:
     print(f"Starting RPCS3 as {address}.", flush=True)
     print(control_summary(), flush=True)
     print("Host from Multiplayer, then LAN Party. Wait to press Ready until the others have joined.", flush=True)
-    os.execv(str(binary), [str(binary), str(game)])
+    _start_game(binary, game)
 
 
 def _overlay_address(record: dict) -> str:
@@ -53,6 +53,13 @@ def _interface_address() -> str | None:
     return None
 
 
+def _start_game(binary: Path, game: Path) -> None:
+    if sys.platform == "win32":
+        subprocess.Popen([str(binary), str(game)], cwd=str(binary.parent))
+        return
+    os.execv(str(binary), [str(binary), str(game)])
+
+
 def _ensure_tunnel() -> None:
     if _interface_address():
         return
@@ -60,13 +67,27 @@ def _ensure_tunnel() -> None:
     if not conf.exists():
         raise SystemExit("The tunnel config is missing. Run the installer again.")
     if sys.platform == "win32":
-        exe = wireguard_app()
-        if exe is None:
-            raise SystemExit("WireGuard is missing. Run the installer again.")
-        subprocess.check_call([exe, "/installtunnelservice", str(conf)])
+        _ensure_windows_tunnel(conf)
         return
     subprocess.check_call(["sudo", "install", "-m", "600", str(conf), "/etc/wireguard/civrev.conf"])
     subprocess.check_call(["sudo", "wg-quick", "up", "civrev"])
+
+
+def _ensure_windows_tunnel(conf: Path) -> None:
+    from link.windows import run_admin_batch, tunnel_action, tunnel_service_name, tunnel_state
+
+    action = tunnel_action(tunnel_state(conf))
+    if action == "skip":
+        return
+    exe = wireguard_app()
+    if exe is None:
+        raise SystemExit("WireGuard is missing. Run the installer again.")
+    if action == "start":
+        print("Starting the tunnel. Approve the administrator prompt.", flush=True)
+        run_admin_batch([["sc", "start", tunnel_service_name(conf)]], required=1)
+        return
+    print("Connecting the tunnel. Approve the administrator prompt.", flush=True)
+    run_admin_batch([[exe, "/installtunnelservice", str(conf)]], required=1)
 
 
 if __name__ == "__main__":

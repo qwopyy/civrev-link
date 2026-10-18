@@ -50,7 +50,7 @@ The repository does not contain the firmware or the game. Paste links to those f
 ./play.sh
 ```
 
-Windows: `play.cmd`.
+Windows: double-click `play.cmd`. Leave it as your normal user. If the tunnel is not already connected, Windows asks for approval once. The window stays open so any error can be read.
 
 One person opens Multiplayer, then LAN Party, and stays on that screen. The others join the game that appears. The host waits until everyone has joined before pressing Ready. Pressing Ready first makes the join fail.
 
