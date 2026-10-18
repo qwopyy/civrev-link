@@ -77,8 +77,8 @@ def become_player(args: argparse.Namespace) -> None:
         _finish_host_player(binary, game)
         return
     ensure_wireguard()
-    endpoint = args.endpoint or input("Host public address: ").strip()
-    passphrase = args.passphrase or getpass.getpass("Room passphrase: ")
+    endpoint = args.endpoint or _ask("Host public address: ")
+    passphrase = args.passphrase or _ask("Room passphrase: ")
     fingerprint = args.fingerprint
     if fingerprint is None:
         fingerprint = input("Host certificate fingerprint (blank to accept this one): ").strip() or None
@@ -193,6 +193,14 @@ def _return_to_desktop_user() -> None:
     os.setuid(account.pw_uid)
     os.execve(sys.executable, [sys.executable, *sys.argv], env)
     raise SystemExit("Could not switch back to the desktop user.")
+
+
+def _ask(label: str) -> str:
+    """Visible prompt. Windows getpass hides typing and drops pasted text from install.cmd."""
+    value = input(label).strip()
+    if not value:
+        raise SystemExit(f"{label.strip().rstrip(':')} was empty.")
+    return value
 
 
 def _required_link(url: str, name: str) -> str:

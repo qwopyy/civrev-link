@@ -10,7 +10,7 @@ if errorlevel 1 (
     goto finish
 )
 set /p PYTHON=<"%PYFILE%"
-"%PYTHON%" install.py %*
+"%PYTHON%" -u install.py %*
 set EXITCODE=%errorlevel%
 :finish
 echo %cmdcmdline% | findstr /i /c:"%~nx0" >nul
