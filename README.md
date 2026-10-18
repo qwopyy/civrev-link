@@ -54,6 +54,8 @@ Windows: `play.cmd`.
 
 One person opens Multiplayer, then LAN Party, and stays on that screen. The others join the game that appears. The host waits until everyone has joined before pressing Ready. Pressing Ready first makes the join fail.
 
+The installer writes a mouse and keyboard profile for this game. Click the game window so it has focus. Move the mouse to pick a tile, left-click to confirm, and right-click or Esc to cancel. WASD pans the map. The arrow keys cycle units. Q opens the city, E diplomacy, Z or the mouse wheel zooms, C shows info, Space skips a unit, and middle-click or V is the special action (found a city, join, form an army). Enter pauses. Tab opens the civilization options. Alt+G and Alt+H change how fast the mouse moves the cursor.
+
 The host machine can play too. Its emulator uses `10.66.0.1` and does not open a second tunnel. Run the player installer there after the host installer if you also want RPCS3 on that machine.
 
 ## Limits

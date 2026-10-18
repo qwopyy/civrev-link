@@ -67,15 +67,25 @@ def install_firmware(binary: Path, pup: Path) -> None:
 
 
 def write_game_config(install_dir: Path, overlay_ip: str) -> list[Path]:
+    return _write_configs(rpcs3_config_dirs(install_dir), overlay_ip)
+
+
+def _write_configs(roots: list[Path], overlay_ip: str) -> list[Path]:
     written: list[Path] = []
     body = _game_yaml(overlay_ip)
-    for root in rpcs3_config_dirs(install_dir):
+    pad = _keyboard_yaml()
+    for root in roots:
         folder = root / "config" / "custom_configs"
         folder.mkdir(parents=True, exist_ok=True)
         for title_id in TITLE_IDS:
             path = folder / f"config_{title_id}.yml"
             path.write_text(body, encoding="utf-8")
             written.append(path)
+            pad_dir = root / "config" / "input_configs" / title_id
+            pad_dir.mkdir(parents=True, exist_ok=True)
+            pad_path = pad_dir / "Default.yml"
+            pad_path.write_text(pad, encoding="utf-8")
+            written.append(pad_path)
     return written
 
 
@@ -90,6 +100,57 @@ def _game_yaml(overlay_ip: str) -> str:
         "  PSN status: Disconnected\n"
         "Miscellaneous:\n"
         "  Silence All Logs: true\n"
+        "Input/Output:\n"
+        '  Mouse: "Null"\n'
+    )
+
+
+def _keyboard_yaml() -> str:
+    """Keyboard pad RPCS3 loads for this title. Mouse movement is the left stick."""
+    return (
+        "Player 1 Input:\n"
+        "  Handler: Keyboard\n"
+        "  Device: Keyboard\n"
+        "  Config:\n"
+        "    Left Stick Left: Mouse MLeft\n"
+        "    Left Stick Down: Mouse MDown\n"
+        "    Left Stick Right: Mouse MRight\n"
+        "    Left Stick Up: Mouse MUp\n"
+        "    Right Stick Left: A\n"
+        "    Right Stick Down: S\n"
+        "    Right Stick Right: D\n"
+        "    Right Stick Up: W\n"
+        "    Start: Return,Enter\n"
+        "    Select: Tab\n"
+        "    Square: Space\n"
+        "    Cross: Mouse Left\n"
+        "    Circle: Mouse Right,Esc\n"
+        "    Triangle: Mouse Middle,V\n"
+        "    Left: Left\n"
+        "    Down: Down\n"
+        "    Right: Right\n"
+        "    Up: Up\n"
+        "    R1: E\n"
+        "    R2: C\n"
+        "    L1: Q\n"
+        "    L2: Z,Wheel Up,Wheel Down\n"
+        "    Mouse Movement Mode: Relative\n"
+        "    Mouse Deadzone X Axis: 5\n"
+        "    Mouse Deadzone Y Axis: 5\n"
+        "    Mouse Acceleration X Axis: 600\n"
+        "    Mouse Acceleration Y Axis: 600\n"
+        "    Left Stick Lerp Factor: 100\n"
+        "    Right Stick Lerp Factor: 100\n"
+        '  Buddy Device: ""\n'
+    )
+
+
+def control_summary() -> str:
+    return (
+        "Mouse and keyboard: move the mouse to pick a tile, left click to confirm, "
+        "right click or Esc to cancel. WASD pans the map. Arrow keys cycle units. "
+        "Q city, E diplomacy, Z or the wheel zooms, C info, Space skips, "
+        "middle click or V is the special action, Enter pauses, Tab opens options."
     )
 
 

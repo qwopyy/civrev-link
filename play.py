@@ -13,7 +13,7 @@ sys.path.insert(0, str(REPO))
 
 from link.client import load_player
 from link.common import HOST_IP, IFACE, config_home
-from link.rpcs3 import write_game_config
+from link.rpcs3 import control_summary, write_game_config
 from link.wgutil import wireguard_app
 
 
@@ -30,6 +30,7 @@ def main() -> None:
     if record.get("role") != "host":
         _ensure_tunnel()
     print(f"Starting RPCS3 as {address}.", flush=True)
+    print(control_summary(), flush=True)
     print("Host from Multiplayer, then LAN Party. Wait to press Ready until the others have joined.", flush=True)
     os.execv(str(binary), [str(binary), str(game)])
 

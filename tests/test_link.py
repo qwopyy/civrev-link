@@ -19,7 +19,7 @@ from link.python_setup import windows_installer_url
 from link.common import as_root, desktop_session_env, fanout_targets, hash_passphrase, passphrase_matches
 from link.introducer import Introducer
 from link.packets import build_ipv4_udp, parse_ip_udp
-from link.rpcs3 import _game_yaml, download_linked_file, filename_from_url
+from link.rpcs3 import _game_yaml, _keyboard_yaml, _write_configs, download_linked_file, filename_from_url
 from link.state import HostState
 from link.wgutil import client_config, first_existing, server_config
 from link.windows import admin_batch, latest_msi_name, msiexec_install_args, wireguard_arch
@@ -80,6 +80,23 @@ class RoomTests(unittest.TestCase):
         self.assertIn("PSN status: Disconnected", text)
         self.assertIn("Bind address: 10.66.0.4", text)
         self.assertIn("Silence All Logs: true", text)
+        self.assertIn('Mouse: "Null"', text)
+
+    def test_keyboard_profile_maps_the_mouse_to_the_left_stick(self) -> None:
+        text = _keyboard_yaml()
+        self.assertIn("Handler: Keyboard", text)
+        self.assertIn("Device: Keyboard", text)
+        self.assertIn("Left Stick Up: Mouse MUp", text)
+        self.assertIn("Cross: Mouse Left", text)
+        self.assertIn("Circle: Mouse Right,Esc", text)
+        self.assertIn("Mouse Movement Mode: Relative", text)
+        with tempfile.TemporaryDirectory() as tmp:
+            written = _write_configs([Path(tmp)], "10.66.0.4")
+            names = {path.name for path in written}
+            self.assertIn("config_BLUS30130.yml", names)
+            self.assertIn("Default.yml", names)
+            pad = Path(tmp) / "config" / "input_configs" / "BLES00238" / "Default.yml"
+            self.assertEqual(pad.read_text(encoding="utf-8"), text)
 
     def test_package_install_escalates_only_the_command(self) -> None:
         command = as_root(["pacman", "-S", "--needed", "--noconfirm", "wireguard-tools"])
