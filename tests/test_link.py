@@ -17,7 +17,7 @@ from link.client import join_room
 from link.common import fanout_targets, hash_passphrase, passphrase_matches
 from link.introducer import Introducer
 from link.packets import build_ipv4_udp, parse_ip_udp
-from link.rpcs3 import _game_yaml
+from link.rpcs3 import _game_yaml, download_linked_file, filename_from_url
 from link.state import HostState
 from link.wgutil import client_config, server_config
 
@@ -54,6 +54,22 @@ class RoomTests(unittest.TestCase):
         self.assertIn("AllowedIPs = 10.66.0.2/32", server)
         self.assertIn("AllowedIPs = 10.66.0.0/24", client)
         self.assertNotIn("0.0.0.0/0", client)
+
+    def test_filename_from_url(self) -> None:
+        self.assertEqual(filename_from_url("https://example.test/files/PS3UPDAT.PUP?token=1"), "PS3UPDAT.PUP")
+        with self.assertRaises(SystemExit):
+            filename_from_url("https://example.test/")
+
+    def test_linked_file_keeps_the_url_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            source = directory / "game.iso"
+            source.write_bytes(b"image")
+            downloaded = download_linked_file(source.as_uri(), directory / "out")
+            self.assertEqual(downloaded.name, "game.iso")
+            self.assertEqual(downloaded.read_bytes(), b"image")
+            again = download_linked_file(source.as_uri(), directory / "out")
+            self.assertEqual(again, downloaded)
 
     def test_game_yaml_binds_the_overlay(self) -> None:
         text = _game_yaml("10.66.0.4")

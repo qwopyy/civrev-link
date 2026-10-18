@@ -8,6 +8,7 @@ import os
 import shutil
 import ssl
 import subprocess
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -31,6 +32,26 @@ def download_rpcs3(dest_dir: Path) -> Path:
         return _extract_windows(target, dest_dir)
     target.chmod(0o755)
     return target
+
+
+def download_linked_file(url: str, dest_dir: Path) -> Path:
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    name = filename_from_url(url)
+    target = dest_dir / name
+    marker = dest_dir / f"{name}.source"
+    if target.exists() and marker.exists() and marker.read_text(encoding="utf-8") == url:
+        return target
+    print(f"downloading {name}", flush=True)
+    _download(url, target)
+    marker.write_text(url, encoding="utf-8")
+    return target
+
+
+def filename_from_url(url: str) -> str:
+    name = Path(urllib.parse.urlparse(url).path).name
+    if not name or name in {".", ".."}:
+        raise SystemExit("the link does not include a file name")
+    return name
 
 
 def install_firmware(binary: Path, pup: Path) -> None:

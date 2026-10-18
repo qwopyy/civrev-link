@@ -17,10 +17,10 @@ REPO = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO))
 
 from link.client import apply_tunnel, join_room, save_player, write_client_tunnel
-from link.common import REPO_ROOT, config_home, is_windows
+from link.common import FIRMWARE_URL, GAME_URL, REPO_ROOT, config_home, is_windows
 from link.firewall import open_ports
 from link.host import WG_PORT, bootstrap, lan_ip, public_ip
-from link.rpcs3 import download_rpcs3, install_firmware, write_game_config
+from link.rpcs3 import download_linked_file, download_rpcs3, install_firmware, write_game_config
 from link.wgutil import generate_keypair, wg_available
 
 
@@ -31,8 +31,6 @@ def main() -> None:
     parser.add_argument("--passphrase", help="room passphrase")
     parser.add_argument("--generate-passphrase", action="store_true", help="create a room passphrase and print it")
     parser.add_argument("--fingerprint", help="sha256 of the host certificate")
-    parser.add_argument("--firmware", help="path to a PS3 firmware .pup you downloaded from Sony")
-    parser.add_argument("--game", help="path to your own game image or dumped game folder")
     args = parser.parse_args()
     if args.host:
         become_host(args)
@@ -61,16 +59,19 @@ def become_host(args: argparse.Namespace) -> None:
     print(f"Certificate fingerprint: {fingerprint}")
     print(f"Forward UDP {WG_PORT} and TCP 51821 to {local}")
     print("Friends clone this repository, run the installer, and enter that endpoint, passphrase, and fingerprint.")
-    print("Each person supplies their own PS3 firmware and their own game image. This repository does not contain either.")
+    print("Firmware and the game image come from FIRMWARE_URL and GAME_URL in link/common.py. Both are blank until a link is added.")
 
 
 def become_player(args: argparse.Namespace) -> None:
+    firmware_url = _required_link(FIRMWARE_URL, "FIRMWARE_URL")
+    game_url = _required_link(GAME_URL, "GAME_URL")
     install_dir = REPO_ROOT / "rpcs3"
     binary = download_rpcs3(install_dir)
-    firmware = ask_path("PS3 firmware .pup from Sony", args.firmware)
+    downloads = config_home() / "downloads"
+    firmware = download_linked_file(firmware_url, downloads)
     print("Installing firmware into RPCS3.", flush=True)
     install_firmware(binary, firmware)
-    game = ask_path("your own game image or game folder", args.game, directory_ok=True)
+    game = download_linked_file(game_url, downloads)
     if _is_host_machine():
         _finish_host_player(binary, game)
         return
@@ -141,36 +142,11 @@ def ensure_wireguard() -> None:
         raise SystemExit("Install wireguard-tools, then run the installer again.")
 
 
-def ask_path(label: str, given: str | None, directory_ok: bool = False) -> Path:
-    if given:
-        path = Path(given).expanduser()
-        if not path.exists():
-            raise SystemExit(f"not found: {path}")
-        return path
-    chosen = _dialog(label, directory_ok)
-    if chosen:
-        return chosen
-    typed = input(f"Path to {label}: ").strip()
-    path = Path(typed).expanduser()
-    if not path.exists():
-        raise SystemExit(f"not found: {path}")
-    return path
-
-
-def _dialog(label: str, directory_ok: bool) -> Path | None:
-    try:
-        import tkinter
-        from tkinter import filedialog
-    except Exception:
-        return None
-    root = tkinter.Tk()
-    root.withdraw()
-    if directory_ok:
-        chosen = filedialog.askopenfilename(title=label) or filedialog.askdirectory(title=label)
-    else:
-        chosen = filedialog.askopenfilename(title=label, filetypes=[("PS3 firmware", "*.pup"), ("All files", "*.*")])
-    root.destroy()
-    return Path(chosen) if chosen else None
+def _required_link(url: str, name: str) -> str:
+    cleaned = url.strip()
+    if not cleaned:
+        raise SystemExit(f"{name} in link/common.py is blank. Add a link there, then run the installer again.")
+    return cleaned
 
 
 def _generated_or_prompt(generate: bool) -> str:

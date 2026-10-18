@@ -23,6 +23,10 @@ MAX_PEERS = 8
 LINUX_RELEASE_API = "https://api.github.com/repos/RPCS3/rpcs3-binaries-linux/releases/latest"
 WINDOWS_RELEASE_API = "https://api.github.com/repos/RPCS3/rpcs3-binaries-win/releases/latest"
 
+# links
+FIRMWARE_URL = "https://www.dropbox.com/scl/fi/iqzlv8gcpoahe87w3fj5z/PS3UPDAT.PUP?rlkey=rslrhn37heukheelwe3hw4be1&st=mf0ysl8n&dl=1"
+GAME_URL = "https://www.dropbox.com/scl/fi/k6m9avybwxc6i24xj102g/Sid-Meier-s-Civilization-Revolution-USA-En-Fr-De-Es-It.iso?rlkey=oo1z5okmhooj97g3v22ct9yi3&st=tebab053&dl=1"
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 

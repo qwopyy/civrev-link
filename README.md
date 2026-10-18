@@ -2,7 +2,7 @@
 
 A small installer for playing Sid Meier's Civilization Revolution together on RPCS3. It installs the official emulator, writes one shared LAN Party configuration, and connects players through a private network hosted on one always-on machine.
 
-The game and the PS3 firmware are not in this repository. Each person uses a firmware update they downloaded from Sony and a game image from a copy they own.
+The game and the PS3 firmware are not in this repository. Links for both files go in `link/common.py` and start out blank.
 
 ## What you need
 
@@ -34,13 +34,16 @@ cd civrev-link
 
 On Windows, double-click `install.cmd` or run it from a prompt.
 
-The installer detects the operating system and downloads the matching official build from the RPCS3 Linux or Windows release. It then asks for:
+The installer detects the operating system and downloads the matching official build from the RPCS3 Linux or Windows release. The firmware and the game image come from two links in `link/common.py`:
 
-1. The PS3 system software `.pup` you downloaded from Sony
-2. Your own game image or a folder dumped from your own copy
-3. The host's public address, room passphrase, and certificate fingerprint
+```python
+FIRMWARE_URL = ""
+GAME_URL = ""
+```
 
-It does not download the game from anywhere.
+Both are blank until a link is added. The installer does not ask for a file location. It then asks for the host's public address, room passphrase, and certificate fingerprint.
+
+The repository does not contain the firmware or the game. Paste links to those files into the two slots above.
 
 ## Playing
 
