@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from link.client import join_room
+from link.python_setup import windows_installer_url
 from link.common import as_root, desktop_session_env, fanout_targets, hash_passphrase, passphrase_matches
 from link.introducer import Introducer
 from link.packets import build_ipv4_udp, parse_ip_udp
@@ -164,6 +165,32 @@ class RoomTests(unittest.TestCase):
         self.assertTrue(lines[3].startswith("netsh "))
         self.assertEqual(lines[4], "exit /b 0")
         self.assertEqual(script.count("if errorlevel 1"), 1)
+
+    def test_windows_python_installer_uses_a_published_exe(self) -> None:
+        page = "\n".join(
+            [
+                '<a href="/downloads/release/python-3160a1/">Python 3.16.0a1</a>',
+                "https://www.python.org/ftp/python/3.14.8/python-3.14.8-amd64.exe",
+                "https://www.python.org/ftp/python/3.15.0/python-3.15.0-amd64.exe",
+                "https://www.python.org/ftp/python/3.15.0/python-3.15.0-arm64.exe",
+                "https://www.python.org/ftp/python/3.15.0/python-3.15.0.exe",
+                "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe",
+            ]
+        )
+        self.assertEqual(
+            windows_installer_url(page, "AMD64"),
+            "https://www.python.org/ftp/python/3.15.0/python-3.15.0-amd64.exe",
+        )
+        self.assertEqual(
+            windows_installer_url(page, "ARM64"),
+            "https://www.python.org/ftp/python/3.15.0/python-3.15.0-arm64.exe",
+        )
+        self.assertEqual(
+            windows_installer_url(page, "x86"),
+            "https://www.python.org/ftp/python/3.15.0/python-3.15.0.exe",
+        )
+        with self.assertRaises(SystemExit):
+            windows_installer_url("Python 3.16.0a1", "AMD64")
 
 
 class IntroducerTests(unittest.TestCase):
