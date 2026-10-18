@@ -81,6 +81,7 @@ class RoomTests(unittest.TestCase):
         self.assertIn("Bind address: 10.66.0.4", text)
         self.assertIn("Silence All Logs: true", text)
         self.assertIn('Mouse: "Null"', text)
+        self.assertIn("DNS address: 10.66.0.1", text)
 
     def test_keyboard_profile_maps_the_mouse_to_the_left_stick(self) -> None:
         text = _keyboard_yaml()

@@ -9,8 +9,10 @@ import threading
 import urllib.request
 from pathlib import Path
 
-from .common import IFACE, WG_PORT, fanout_targets, hash_passphrase, host_state_dir
+from .common import HOST_IP, IFACE, WG_PORT, fanout_targets, hash_passphrase, host_state_dir
+from .dnsfwd import DnsForwarder
 from .introducer import Introducer
+from .overlay import ensure_lan
 from .repeater import DiscoveryRepeater
 from .state import HostState
 from .wgutil import generate_keypair, server_config, write_private
@@ -38,8 +40,10 @@ def run() -> None:
         with introducer._lock:
             return fanout_targets(source, state.peer_ips())
 
+    ensure_lan(state.peer_ips())
     repeater = DiscoveryRepeater(targets)
     threading.Thread(target=repeater.serve, daemon=True).start()
+    threading.Thread(target=DnsForwarder(HOST_IP).serve, daemon=True).start()
     introducer.serve()
 
 

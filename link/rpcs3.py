@@ -12,7 +12,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from .common import LINUX_RELEASE_API, TITLE_IDS, WINDOWS_RELEASE_API, is_windows, rpcs3_config_dirs
+from .common import HOST_IP, LINUX_RELEASE_API, TITLE_IDS, WINDOWS_RELEASE_API, is_windows, rpcs3_config_dirs
 
 USER_AGENT = "civrev-link"
 
@@ -95,7 +95,7 @@ def _game_yaml(overlay_ip: str) -> str:
         "  Internet enabled: Connected\n"
         f"  IP address: {overlay_ip}\n"
         f"  Bind address: {overlay_ip}\n"
-        "  DNS address: 8.8.8.8\n"
+        f"  DNS address: {HOST_IP}\n"
         "  UPNP Enabled: false\n"
         "  PSN status: Disconnected\n"
         "Miscellaneous:\n"
