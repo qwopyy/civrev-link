@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import socket
 import subprocess
@@ -14,12 +15,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from link.client import join_room
-from link.common import fanout_targets, hash_passphrase, passphrase_matches
+from link.common import as_root, desktop_session_env, fanout_targets, hash_passphrase, passphrase_matches
 from link.introducer import Introducer
 from link.packets import build_ipv4_udp, parse_ip_udp
 from link.rpcs3 import _game_yaml, download_linked_file, filename_from_url
 from link.state import HostState
-from link.wgutil import client_config, server_config
+from link.wgutil import client_config, first_existing, server_config
+from link.windows import admin_batch, latest_msi_name, msiexec_install_args, wireguard_arch
 
 
 class PacketTests(unittest.TestCase):
@@ -77,6 +79,91 @@ class RoomTests(unittest.TestCase):
         self.assertIn("PSN status: Disconnected", text)
         self.assertIn("Bind address: 10.66.0.4", text)
         self.assertIn("Silence All Logs: true", text)
+
+    def test_package_install_escalates_only_the_command(self) -> None:
+        command = as_root(["pacman", "-S", "--needed", "--noconfirm", "wireguard-tools"])
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.assertEqual(command, ["pacman", "-S", "--needed", "--noconfirm", "wireguard-tools"])
+        else:
+            self.assertEqual(command, ["sudo", "pacman", "-S", "--needed", "--noconfirm", "wireguard-tools"])
+
+    def test_sudo_session_gets_the_wayland_socket_back(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = root / "runtime"
+            home = root / "home"
+            runtime.mkdir()
+            home.mkdir()
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.bind(str(runtime / "wayland-1"))
+            (runtime / "wayland-1.lock").write_text("", encoding="utf-8")
+            (runtime / "bus").touch()
+            try:
+                env = desktop_session_env(
+                    {"SUDO_USER": "qwopy", "SUDO_UID": "1000", "DISPLAY": ":0", "PATH": "/usr/bin"},
+                    "qwopy",
+                    home,
+                    runtime,
+                )
+            finally:
+                sock.close()
+            self.assertEqual(env["HOME"], str(home))
+            self.assertEqual(env["USER"], "qwopy")
+            self.assertEqual(env["WAYLAND_DISPLAY"], "wayland-1")
+            self.assertEqual(env["XDG_RUNTIME_DIR"], str(runtime))
+            self.assertEqual(env["DISPLAY"], ":0")
+            self.assertEqual(env["DBUS_SESSION_BUS_ADDRESS"], f"unix:path={runtime / 'bus'}")
+            self.assertNotIn("SUDO_USER", env)
+            self.assertNotIn("SUDO_UID", env)
+
+    def test_installer_does_not_import_pwd_at_startup(self) -> None:
+        tree = ast.parse((Path(__file__).resolve().parent.parent / "install.py").read_text(encoding="utf-8"))
+        imported = [alias.name for node in tree.body if isinstance(node, ast.Import) for alias in node.names]
+        self.assertNotIn("pwd", imported)
+
+    def test_windows_wireguard_is_found_beside_the_app(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "WireGuard" / "wg.exe"
+            exe.parent.mkdir()
+            exe.write_bytes(b"")
+            missing = Path(tmp) / "missing" / "wg.exe"
+            self.assertEqual(first_existing([missing, exe]), str(exe))
+            self.assertIsNone(first_existing([missing]))
+
+    def test_windows_installer_picks_the_newest_official_msi(self) -> None:
+        page = "\n".join(
+            [
+                "wireguard-amd64-1.0.0.msi",
+                "wireguard-amd64-1.10.0.msi",
+                "wireguard-amd64-1.9.2.msi",
+                "wireguard-arm64-1.11.0.msi",
+            ]
+        )
+        self.assertEqual(latest_msi_name(page, "amd64"), "wireguard-amd64-1.10.0.msi")
+        self.assertEqual(wireguard_arch("AMD64"), "amd64")
+        self.assertEqual(wireguard_arch("ARM64"), "arm64")
+        with self.assertRaises(SystemExit):
+            wireguard_arch("mips")
+        args = msiexec_install_args(Path(r"C:\Downloads\wireguard-amd64-1.10.0.msi"))
+        self.assertEqual(args[:2], ["msiexec", "/i"])
+        self.assertEqual(args[-2:], ["/qn", "DO_NOT_LAUNCH=1"])
+
+    def test_tunnel_failure_is_not_hidden_by_later_firewall_rules(self) -> None:
+        script = admin_batch(
+            [
+                [r"C:\Program Files\WireGuard\wireguard.exe", "/installtunnelservice", r"C:\room files\civrev.conf"],
+                ["netsh", "advfirewall", "firewall", "add", "rule"],
+            ],
+            required=1,
+        )
+        lines = [line for line in script.splitlines() if line]
+        self.assertEqual(lines[0], "@echo off")
+        self.assertIn(r"C:\Program Files\WireGuard\wireguard.exe", lines[1])
+        self.assertIn(r"C:\room files\civrev.conf", lines[1])
+        self.assertEqual(lines[2], "if errorlevel 1 exit /b %errorlevel%")
+        self.assertTrue(lines[3].startswith("netsh "))
+        self.assertEqual(lines[4], "exit /b 0")
+        self.assertEqual(script.count("if errorlevel 1"), 1)
 
 
 class IntroducerTests(unittest.TestCase):

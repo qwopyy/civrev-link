@@ -14,6 +14,7 @@ sys.path.insert(0, str(REPO))
 from link.client import load_player
 from link.common import HOST_IP, IFACE, config_home
 from link.rpcs3 import write_game_config
+from link.wgutil import wireguard_app
 
 
 def main() -> None:
@@ -58,8 +59,10 @@ def _ensure_tunnel() -> None:
     if not conf.exists():
         raise SystemExit("The tunnel config is missing. Run the installer again.")
     if sys.platform == "win32":
-        exe = Path(r"C:\Program Files\WireGuard\wireguard.exe")
-        subprocess.check_call([str(exe), "/installtunnelservice", str(conf)])
+        exe = wireguard_app()
+        if exe is None:
+            raise SystemExit("WireGuard is missing. Run the installer again.")
+        subprocess.check_call([exe, "/installtunnelservice", str(conf)])
         return
     subprocess.check_call(["sudo", "install", "-m", "600", str(conf), "/etc/wireguard/civrev.conf"])
     subprocess.check_call(["sudo", "wg-quick", "up", "civrev"])

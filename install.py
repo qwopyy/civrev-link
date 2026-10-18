@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO))
 
 from link.client import apply_tunnel, join_room, save_player, write_client_tunnel
-from link.common import FIRMWARE_URL, GAME_URL, REPO_ROOT, config_home, is_windows
+from link.common import FIRMWARE_URL, GAME_URL, REPO_ROOT, as_root, config_home, desktop_session_env, is_root, is_windows
 from link.firewall import open_ports
 from link.host import WG_PORT, bootstrap, lan_ip, public_ip
 from link.rpcs3 import download_linked_file, download_rpcs3, install_firmware, write_game_config
@@ -39,7 +39,7 @@ def main() -> None:
 
 
 def become_host(args: argparse.Namespace) -> None:
-    if not is_windows() and hasattr(os, "geteuid") and os.geteuid() != 0:
+    if not is_windows() and not is_root():
         os.execvp("sudo", ["sudo", sys.executable, *sys.argv])
     ensure_wireguard()
     passphrase = args.passphrase or _generated_or_prompt(args.generate_passphrase)
@@ -63,6 +63,7 @@ def become_host(args: argparse.Namespace) -> None:
 
 
 def become_player(args: argparse.Namespace) -> None:
+    _return_to_desktop_user()
     firmware_url = _required_link(FIRMWARE_URL, "FIRMWARE_URL")
     game_url = _required_link(GAME_URL, "GAME_URL")
     install_dir = REPO_ROOT / "rpcs3"
@@ -95,9 +96,8 @@ def become_player(args: argparse.Namespace) -> None:
     }
     save_player(record)
     conf = write_client_tunnel(record)
-    apply_tunnel(conf)
+    _bring_link_up(conf)
     written = write_game_config(binary.parent, reply["ip"])
-    open_ports()
     print()
     print(f"Joined as {reply['ip']}.")
     print(f"RPCS3 config written for both Civilization Revolution editions ({len(written)} files).")
@@ -128,18 +128,71 @@ def _is_host_machine() -> bool:
     return Path("/var/lib/civrev-link/state.json").exists()
 
 
+def _bring_link_up(conf: Path) -> None:
+    if not is_windows():
+        apply_tunnel(conf)
+        open_ports()
+        return
+    from link.firewall import windows_commands
+    from link.wgutil import wireguard_app
+    from link.windows import run_admin_batch
+
+    exe = wireguard_app()
+    if exe is None:
+        raise SystemExit("WireGuard installed, but wireguard.exe was not found. Run the installer again.")
+    print("Connecting the tunnel and opening the game ports. Approve the administrator prompt.", flush=True)
+    run_admin_batch([[exe, "/installtunnelservice", str(conf)], *windows_commands()], required=1)
+
+
 def ensure_wireguard() -> None:
     if wg_available():
         return
     if is_windows():
-        raise SystemExit("Install WireGuard for Windows from https://www.wireguard.com/install/ and run the installer again.")
-    if _command_exists("pacman"):
-        subprocess.check_call(["pacman", "-S", "--needed", "--noconfirm", "wireguard-tools"])
-    elif _command_exists("apt-get"):
-        subprocess.check_call(["apt-get", "update"])
-        subprocess.check_call(["apt-get", "install", "-y", "wireguard"])
+        from link.windows import install_wireguard
+
+        install_wireguard(config_home() / "downloads")
+        if not wg_available():
+            raise SystemExit("WireGuard installed, but wg.exe was not found. Run the installer again.")
+        return
+    print("Installing WireGuard. This asks for your password.", flush=True)
+    try:
+        if _command_exists("pacman"):
+            subprocess.check_call(as_root(["pacman", "-S", "--needed", "--noconfirm", "wireguard-tools"]))
+        elif _command_exists("apt-get"):
+            subprocess.check_call(as_root(["apt-get", "update"]))
+            subprocess.check_call(as_root(["apt-get", "install", "-y", "wireguard"]))
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"Could not install WireGuard (exit {exc.returncode}). Approve the sudo prompt and run ./install.sh again.") from None
     if not wg_available():
         raise SystemExit("Install wireguard-tools, then run the installer again.")
+
+
+def _return_to_desktop_user() -> None:
+    """RPCS3 is a GUI program. sudo keeps the root user and drops the Wayland session."""
+    if is_windows() or not is_root():
+        return
+    user = os.environ.get("SUDO_USER", "")
+    if not user or user == "root":
+        raise SystemExit("Run ./install.sh as your desktop user. It asks for your password when it needs root.")
+    import pwd
+
+    try:
+        account = pwd.getpwnam(user)
+    except KeyError:
+        raise SystemExit(f"sudo started this as root, and {user} is not a local account.") from None
+    runtime = Path(f"/run/user/{account.pw_uid}")
+    env = desktop_session_env(
+        dict(os.environ),
+        user,
+        Path(account.pw_dir),
+        runtime if runtime.is_dir() else None,
+    )
+    print(f"Switching back to {user} so RPCS3 can use the display.", flush=True)
+    os.initgroups(user, account.pw_gid)
+    os.setgid(account.pw_gid)
+    os.setuid(account.pw_uid)
+    os.execve(sys.executable, [sys.executable, *sys.argv], env)
+    raise SystemExit("Could not switch back to the desktop user.")
 
 
 def _required_link(url: str, name: str) -> str:

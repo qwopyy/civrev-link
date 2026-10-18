@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -32,6 +33,40 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def is_windows() -> bool:
     return sys.platform == "win32"
+
+
+def is_root() -> bool:
+    return hasattr(os, "geteuid") and os.geteuid() == 0
+
+
+def as_root(argv: list[str]) -> list[str]:
+    """Run a command as root. Desktop sessions stay unelevated and use sudo."""
+    if is_windows() or is_root():
+        return list(argv)
+    if shutil.which("sudo") is None:
+        raise SystemExit("This step needs root, and sudo is not installed.")
+    return ["sudo", *argv]
+
+
+def desktop_session_env(environ: dict[str, str], user: str, home: Path, runtime: Path | None) -> dict[str, str]:
+    """Rebuild the desktop session sudo drops. RPCS3 needs the Wayland socket."""
+    env = {key: value for key, value in environ.items() if not key.startswith("SUDO_")}
+    env["HOME"] = str(home)
+    env["USER"] = user
+    env["LOGNAME"] = user
+    if runtime is not None and runtime.is_dir():
+        env["XDG_RUNTIME_DIR"] = str(runtime)
+        if not env.get("WAYLAND_DISPLAY"):
+            sockets = sorted(path.name for path in runtime.iterdir() if path.is_socket() and path.name.startswith("wayland-"))
+            if sockets:
+                env["WAYLAND_DISPLAY"] = sockets[-1]
+        bus = runtime / "bus"
+        if not env.get("DBUS_SESSION_BUS_ADDRESS") and bus.exists():
+            env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={bus}"
+        authority = home / ".Xauthority"
+        if not env.get("XAUTHORITY") and authority.is_file():
+            env["XAUTHORITY"] = str(authority)
+    return env
 
 
 def config_home() -> Path:

@@ -76,10 +76,12 @@ def write_client_tunnel(record: dict) -> Path:
 
 def apply_tunnel(conf: Path) -> None:
     if is_windows():
-        exe = Path(r"C:\Program Files\WireGuard\wireguard.exe")
-        if not exe.exists():
-            raise SystemExit("Install WireGuard for Windows from https://www.wireguard.com/install/ and run the installer again.")
-        subprocess.check_call([str(exe), "/installtunnelservice", str(conf)])
+        from .wgutil import wireguard_app
+
+        exe = wireguard_app()
+        if exe is None:
+            raise SystemExit("WireGuard is missing. Run the installer again.")
+        subprocess.check_call([exe, "/installtunnelservice", str(conf)])
         return
     subprocess.run(["sudo", "wg-quick", "down", "civrev"], check=False, capture_output=True)
     subprocess.check_call(["sudo", "install", "-m", "600", str(conf), "/etc/wireguard/civrev.conf"])

@@ -2,23 +2,52 @@
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
-from .common import HOST_IP, IFACE, NETWORK, PREFIX, WG_PORT
+from .common import HOST_IP, IFACE, NETWORK, PREFIX, WG_PORT, is_windows
 
 
 def wg_available() -> bool:
-    from shutil import which
+    return wg_binary() is not None
 
-    return which("wg") is not None
+
+def wg_binary() -> str | None:
+    """The wg tool. The Windows app installs it beside wireguard.exe and does not add it to PATH."""
+    found = shutil.which("wg")
+    if found:
+        return found
+    if not is_windows():
+        return None
+    return first_existing([Path(root) / "WireGuard" / "wg.exe" for root in _program_roots()])
+
+
+def wireguard_app() -> str | None:
+    if not is_windows():
+        return None
+    return first_existing([Path(root) / "WireGuard" / "wireguard.exe" for root in _program_roots()])
+
+
+def _program_roots() -> list[str]:
+    roots = [os.environ.get("ProgramFiles", r"C:\Program Files"), os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")]
+    return [root for root in roots if root]
+
+
+def first_existing(candidates: list[Path]) -> str | None:
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def generate_keypair() -> tuple[str, str]:
-    if not wg_available():
+    binary = wg_binary()
+    if binary is None:
         raise SystemExit("wireguard-tools is not installed (the wg command is missing)")
-    private = subprocess.check_output(["wg", "genkey"], text=True).strip()
-    public = subprocess.check_output(["wg", "pubkey"], input=private + "\n", text=True).strip()
+    private = subprocess.check_output([binary, "genkey"], text=True).strip()
+    public = subprocess.check_output([binary, "pubkey"], input=private + "\n", text=True).strip()
     return private, public
 
 

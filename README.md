@@ -7,9 +7,7 @@ The game and the PS3 firmware are not in this repository. Links for both files g
 ## What you need
 
 - Windows or Linux
-- Python 3.11 or newer
-- WireGuard (`wireguard-tools` on Linux, the official Windows app from https://www.wireguard.com/install/)
-- On Windows, 7-Zip, because the official RPCS3 build is a `.7z` archive
+- Python 3.11 or newer. On Windows, use the python.org installer and enable "Add python.exe to PATH"
 - The same game version on every machine. A 1.00 image and a 1.30 image can see each other and still fail to join
 
 Civilization Revolution finds players with a LAN broadcast. It does not have a confirmed internet matchmaking service on RPCS3. This link gives every machine an address on `10.66.0.0/24` and repeats those broadcasts. The tunnel only carries that network. It does not send the rest of your traffic through the host.
@@ -32,7 +30,9 @@ cd civrev-link
 ./install.sh
 ```
 
-On Windows, double-click `install.cmd` or run it from a prompt.
+Run that as your normal user. The installer uses `sudo` itself to install WireGuard and open the game ports. RPCS3 has to stay on your account so it can open on this display. Starting the player installer with `sudo` switches back to your user before that step.
+
+On Windows, double-click `install.cmd`. It downloads RPCS3, a 7-Zip extractor, and the official WireGuard installer. Approve the administrator prompts. The machine that stays on is the Linux host above.
 
 The installer detects the operating system and downloads the matching official build from the RPCS3 Linux or Windows release. The firmware and the game image come from two links in `link/common.py`:
 

@@ -57,7 +57,13 @@ def filename_from_url(url: str) -> str:
 def install_firmware(binary: Path, pup: Path) -> None:
     if pup.suffix.lower() != ".pup":
         raise SystemExit(f"{pup} is not a PS3 firmware .pup file")
-    subprocess.check_call([str(binary), "--installfw", str(pup)])
+    try:
+        subprocess.check_call([str(binary), "--installfw", str(pup)])
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(
+            f"RPCS3 could not install the firmware (exit {exc.returncode}). "
+            "Run ./install.sh as your desktop user so it can open a window."
+        ) from None
 
 
 def write_game_config(install_dir: Path, overlay_ip: str) -> list[Path]:
@@ -87,15 +93,31 @@ def _game_yaml(overlay_ip: str) -> str:
     )
 
 
+SEVEN_ZIP_URL = "https://www.7-zip.org/a/7zr.exe"
+
+
 def _extract_windows(archive: Path, dest_dir: Path) -> Path:
-    extractor = shutil.which("7z") or shutil.which("7za")
-    if extractor is None:
-        raise SystemExit("Install 7-Zip so the Windows RPCS3 archive can be unpacked, then run the installer again.")
-    subprocess.check_call([extractor, "x", "-y", f"-o{dest_dir}", str(archive)])
+    extractor = _windows_extractor(dest_dir)
+    subprocess.check_call([str(extractor), "x", "-y", f"-o{dest_dir}", str(archive)])
     found = next(dest_dir.rglob("rpcs3.exe"), None)
     if found is None:
         raise SystemExit("RPCS3 archive unpacked, but rpcs3.exe was not in it")
     return found
+
+
+def _windows_extractor(dest_dir: Path) -> Path:
+    found = shutil.which("7z") or shutil.which("7za")
+    if found:
+        return Path(found)
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    installed = Path(program_files) / "7-Zip" / "7z.exe"
+    if installed.is_file():
+        return installed
+    bundled = dest_dir / "7zr.exe"
+    if not bundled.exists():
+        print("downloading the 7-Zip extractor", flush=True)
+        _download(SEVEN_ZIP_URL, bundled)
+    return bundled
 
 
 def _get_json(url: str) -> dict:
